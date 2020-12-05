@@ -18,9 +18,8 @@
 				height: 100% }
 			#chat
 				{ position: fixed;
-				right: 5em;
+				left: 80%;
 				top: 50%;
-				bottom: 0;
 				width: 20em;
 				color: white;
 				transition: opacity 0.2s ease; }
@@ -28,21 +27,30 @@
 			#chat > div
 				{ overflow: hidden;
 				width: 100%;
-				height: 20ex; }
+				height: 30ex; }
 			input
 				{ display: block;
 				font-size: 1em;
 				max-width: 100%;
-				background: rgba(0,0,0,0);
-				border: none;
-				border-bottom: 2px solid rgba(255,255,255,0.5);
-				border-left: 2px solid rgba(255,255,255,0.5);
-				outline: rgba(0,0,0,0.5);
+				background: rgba(255,255,255,0.05);
+				border: 1px solid rgba(255,255,255, 0.1);
 				color: white;
-				padding: 0.5em;
+				padding: 0.1em;
 				margin-top: 0.5em; }
 			.opaque { opacity: 0; }
 			strong { padding-right: 1em; }
+			.modal
+				{ position: fixed;
+				top: 33%;
+				left: 33%;
+				bottom: 33%;
+				right: 33%;
+				background: white;
+				z-index: 1000; }
+			.modal > button
+				{ position: absolute;
+				right: 1em;
+				bottom: 1em; }
         </style>
         <script>
 			const first = x => x[0]
@@ -65,6 +73,16 @@
 			let input
 			const colours = new Map()
 
+			function get(x)
+				{ return new Promise((yes, no) =>
+					{ const req = new XMLHttpRequest()
+					req.onload = () => yes(req.responseText)
+					req.open("GET", x)
+					req.send() })}
+
+			function empty(x)
+				{ while(x.firstChild) x.firstChild.remove() }
+
 			class Elem
 				{ constructor(x)
 					{ this.x = typeof x === 'string' ? document.createElement(x) : x }
@@ -75,11 +93,17 @@
 				child(x)
 					{ this.x.appendChild(x)
 					return this }
+				children(xs)
+					{ for (const x of xs) this.child(x)
+					return this }
 				class(x)
 					{ this.x.className = x
 					return this }
 				colour(x)
 					{ this.x.style.color = x
+					return this }
+				value(x)
+					{ this.x.value = x
 					return this }
 				get()
 					{ return this.x }}
@@ -112,8 +136,9 @@
 						chat = qs('#chat')
 						chatlog = qs('#chat > div')
 						input = qs ('#chat input')
+						input.onmousedown = start_drag
+						input.onmouseup = end_drag
 						video = qs('video')
-						video.classList.remove('hide')
 						video.addEventListener('pause', () => ws.send(msg('pause')))
 						video.addEventListener('play', () => ws.send(msg('play', video.currentTime)))
 						window.onkeydown = global_key_down
@@ -124,6 +149,16 @@
 					catch (e)
 						{ alert(e) }}}
 
+			function start_drag()
+				{ document.onmousemove = drag }
+
+			function end_drag()
+				{ document.onmousemove = null }
+
+			function drag(e)
+				{ chat.style.top = e.clientY-chat.clientHeight*0.95+'px'
+				chat.style.left = e.clientX-chat.clientWidth*0.5+'px' }
+
 			function hide_chat()
 				{ clearTimeout(opaque_timer)
 				opaque_timer = setTimeout(() => chat.classList.add('opaque'), 1000) }
@@ -131,7 +166,8 @@
 			function add_chat_message(x)
 				{ chatlog.appendChild(x)
 				chat.classList.remove('opaque')
-				hide_chat() }
+				chatlog.scrollTop = chatlog.scrollHeight
+				if (document.activeElement !== input) hide_chat() }
 
 			function on_message(message)
 				{ const x = JSON.parse(message.data)
@@ -157,21 +193,52 @@
 					case 'play':
 						video.currentTime = second(x)
 						video.play()
-						break }}
+						break
+					case 'video':
+						video.classList.remove('hide')
+						video.src = `/video/${second(x)}`
+						break
+					case 'ping':
+						ws.send(msg('pong')) }}
 
 			function global_key_down(e)
 				{ if (e.keyCode === 13)
-					{ if (document.activeElement !== input)
-						{ input.focus()
-						chat.classList.remove('opaque')
-						clearTimeout(opaque_timer) }
-					else
-						{ if (input.value.trim())
-							{ ws.send(msg('chat', input.value))
-							input.value = '' }
-						input.blur()
-						chat.classList.add('opaque') }}
+					enter_pressed(e)
+				else if (e.keyCode === 112)
+					f1_pressed(e)
 				return true }
+
+			function enter_pressed(e)
+				{ if (document.activeElement !== input)
+					{ input.focus()
+					chat.classList.remove('opaque')
+					clearTimeout(opaque_timer) }
+				else
+					{ if (input.value.trim())
+						{ ws.send(msg('chat', input.value))
+						input.value = '' }
+					else
+						{ input.blur()
+						chat.classList.add('opaque') }}}
+
+			function f1_pressed(e)
+				{ get('/video').then(x =>
+					{ const files = JSON.parse(x)
+					const modal = qs('.modal')
+					const body = qs('.modal-body')
+					const button = qs('.modal > button')
+					empty(body)
+					const select = Elem.of('select')
+						.children(
+							files.map(x => Elem.of('option').value(x).text(x).get()))
+						.get()
+					body.appendChild(select)
+					button.onclick = () => {
+						ws.send(msg('video', select.value))
+						modal.classList.add('hide')
+						empty(body) }
+					modal.classList.remove('hide') })
+				.catch(console.log) }
 
 			window.onload = main
 		</script>
@@ -179,7 +246,12 @@
 	<body>
 		<p>Hello, world!</p>
 
-		<video controls src='/video' class='hide'></video>
+		<video controls class='hide'></video>
+
+		<div class='modal hide'>
+			<div class='modal-body'></div>
+			<button>OK</button>
+		</div>
 
 		<section id='chat'>
 			<div>

@@ -1,14 +1,25 @@
 const http = require('http')
 const fs = require('fs')
 const ws = require('ws')
+const stream = require('stream')
 
 const log = console.log
 const first = x => x[0]
 const second = x => x[1]
 const tail = x => x.slice(1)
 
+const seconds = x => x * 1000
+const minutes = x => seconds(60*x)
+
 let CONF = {}
+let video = null
 const connected = new Set()
+
+const MIME =
+	{ text: 'text/plain',
+	html: 'text/html',
+	bin: 'application/octet-stream',
+	json: 'application/json', }
 
 async function main()
 	{ CONF = JSON.parse(await read_file('config.json'))
@@ -18,15 +29,30 @@ async function main()
 
 	http.createServer(request_listener)
 	.on('upgrade', (req, socket, head) => verify_request(req, socket, head, wss))
-	.listen(CONF.port, CONF.hostname, () => log(`server running at ${CONF.hostname}:${CONF.port}`)) }
+	.listen(CONF.port, CONF.hostname, () => log(`server running at ${CONF.hostname}:${CONF.port}`))
+
+	setInterval(ping, minutes(10)) }
+
+function ping()
+	{ for (const x of connected.values())
+		{ if (!x.pong) x.close()
+		else
+			{ x.pong = false
+			x.send(msg('ping')) }}}
 
 function on_ws_connection(ws)
 	{ connected.add(ws)
 	ws.name = 'anonymous'
+	ws.pong = true
 	ws.on('message', on_message)
-	ws.on('close', () => connected.delete(ws))
-	ws.on('error', () => connected.delete(ws))
-	broadcast(msg('join', ws.name)) }
+	ws.on('close', on_close_or_error)
+	ws.on('error', on_close_or_error)
+	broadcast(msg('join', ws.name))
+	if (video) ws.send(msg('video', video)) }
+
+function on_close_or_error()
+	{ connected.delete(this)
+	if (connected.size === 0) video = null }
 
 function on_message(message)
 	{ try
@@ -45,6 +71,13 @@ function on_message(message)
 				break
 			case 'play':
 				broadcast(msg('play', second(x)))
+				break
+			case 'video':
+				video = second(x)
+				broadcast(msg('video', video))
+				break
+			case 'pong':
+				this.pong = true
 				break
 			default:
 				this.send(msg('error', 'unrecognised command: ' + first(x)))
@@ -78,6 +111,14 @@ function read_file(x)
 		fs.readFile(x, (err, data) =>
 			err ? no(err) : yes(data))) }
 
+function access_file(x, mode)
+	{ return new Promise((yes, no) =>
+		fs.access(x, mode, err => err ? no(err) : yes(x))) }
+
+function read_dir(x)
+	{ return new Promise((yes, no) =>
+		fs.readdir(x, (err, files) => err ? no(err) : yes(files))) }
+
 async function request_listener(req, res)
 	{ const f = route(req)
 	const s = serve(res)
@@ -85,36 +126,47 @@ async function request_listener(req, res)
 	try
 		{ s(await f(req)) }
 	catch(e)
-		{ s(internal_server_error(e.message)) }}
+		{ s(internal_server_error(e)) }}
 
 function route(req)
-	{ switch(req.url)
-		{ case '/':
+	{ switch(true)
+		{ case req.url === '/':
 			return front_page
-		case '/video':
-			return video
+		case req.url === '/video':
+			return list_videos
+		case req.url.startsWith('/video/'):
+			return video_file
 		default: return null }}
 
 function not_found(x)
-	{ return ({ status: 404, data: `not found: ${x}` }) }
+	{ return ({ status: 404, data: `not found: ${x}`, mime: MIME.text }) }
 
 function serve(res)
-	{ return function({ status, data })
-		{ res.writeHead(status).end(data) }}
+	{ return function({ status, data, mime=MIME.bin })
+		{ res.writeHead(status, { 'Content-Type' : mime })
+		if (data instanceof stream.Readable)
+			data.pipe(res)
+		else res.end(data) }}
 
 function front_page()
 	{ return read_file('index.html')
-	.then(x => ({ status: 200, data: x })) }
+	.then(x => ({ status: 200, data: x, mime: MIME.html })) }
 
-function video()
+function list_videos()
+	{ if (!auth) return Promise.resolve(unrecognised())
+	return read_dir('video').then(xs => ({ status: 200, data: JSON.stringify(xs), mime: MIME.json })) }
+
+function video_file(req)
 	{ if (!auth) return Promise.resolve(unauthorized())
-	else return read_file('video')
-	.then(x => ({ status: 200, data: x })) }
+	const x = tail(req.url)
+	return access_file(x, fs.R_OK)
+		.then(x => ({ status: 200, data: fs.createReadStream(x), mime: MIME.bin }))
+		.catch(() => Promise.resolve(not_found(x))) }
 
 function internal_server_error(x)
-	{ return ({ status: 500, data: `internal server error: ${x}` }) }
+	{ return ({ status: 500, data: `internal server error: ${x}`, mime: MIME.text }) }
 
 function unauthorized()
-	{ return ({ status: 401, data: 'unauthorized' }) }
+	{ return ({ status: 401, data: 'unauthorized', mime: MIME.text }) }
 
 main()
