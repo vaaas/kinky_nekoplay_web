@@ -4,7 +4,45 @@
         <title>Kinky Nekoplay 2: intellectual edition</title>
         <meta charset='utf-8'/>
         <style>
+			html
+				{ background: black;
+				font-family: sans-serif; }
 			.hide { display: none; }
+			video
+				{ position: fixed;
+				top: 0;
+				left: 0;
+				right: 0;
+				bottom: 0;
+				width: 100%;
+				height: 100% }
+			#chat
+				{ position: fixed;
+				right: 5em;
+				top: 50%;
+				bottom: 0;
+				width: 20em;
+				color: white;
+				transition: opacity 0.2s ease; }
+			#chat, #chat input { text-shadow: 1px 1px 0px black, -1px -1px 0px black, 0px 0px 8px black; }
+			#chat > div
+				{ overflow: hidden;
+				width: 100%;
+				height: 20ex; }
+			input
+				{ display: block;
+				font-size: 1em;
+				max-width: 100%;
+				background: rgba(0,0,0,0);
+				border: none;
+				border-bottom: 2px solid rgba(255,255,255,0.5);
+				border-left: 2px solid rgba(255,255,255,0.5);
+				outline: rgba(0,0,0,0.5);
+				color: white;
+				padding: 0.5em;
+				margin-top: 0.5em; }
+			.opaque { opacity: 0; }
+			strong { padding-right: 1em; }
         </style>
         <script>
 			const first = x => x[0]
@@ -16,12 +54,16 @@
 			const elem = x => document.createElement(x)
 			const qs = x => document.querySelector(x)
 			const child = e => tap(x => x.appendChild(e))
-			const P = (x, ...fs) => fs.reduce((a,b) => b(a), x)
-			const PP = (...fs) => x => P(x, ...fs)
 			const text = x => document.createTextNode(x)
+			const randint = (a, b) => Math.floor(Math.random()*(b-a) + a)
+
 			let ws
+			let chat
 			let chatlog
 			let video
+			let opaque_timer
+			let input
+			const colours = new Map()
 
 			class Elem
 				{ constructor(x)
@@ -33,9 +75,22 @@
 				child(x)
 					{ this.x.appendChild(x)
 					return this }
+				class(x)
+					{ this.x.className = x
+					return this }
+				colour(x)
+					{ this.x.style.color = x
+					return this }
 				get()
 					{ return this.x }}
 
+			function colour(x)
+				{ if (!colours.has(x))
+					{ const h = randint(0, 359)
+					const s = randint(20, 90)
+					const l = randint(40, 80)
+					colours.set(x, `hsl(${h}, ${s}%, ${l}%)`) }
+				return colours.get(x) }
 
 			function open_websocket_connection(x)
 				{ return new Promise((yes, no) =>
@@ -54,34 +109,45 @@
 						document.cookie = `p=${pass}`
 						ws = await open_websocket_connection(`ws://${location.hostname}:${location.port}`)
 						ws.onmessage = on_message
+						chat = qs('#chat')
 						chatlog = qs('#chat > div')
-						qs('#chat input').onkeydown = on_key_down
+						input = qs ('#chat input')
 						video = qs('video')
 						video.classList.remove('hide')
 						video.addEventListener('pause', () => ws.send(msg('pause')))
 						video.addEventListener('play', () => ws.send(msg('play', video.currentTime)))
+						window.onkeydown = global_key_down
 						ws.name = prompt('username?')
 						ws.send(msg('name', ws.name))
+						hide_chat()
 						return }
 					catch (e)
 						{ alert(e) }}}
 
+			function hide_chat()
+				{ clearTimeout(opaque_timer)
+				opaque_timer = setTimeout(() => chat.classList.add('opaque'), 1000) }
+
+			function add_chat_message(x)
+				{ chatlog.appendChild(x)
+				chat.classList.remove('opaque')
+				hide_chat() }
+
 			function on_message(message)
 				{ const x = JSON.parse(message.data)
-				console.log(message.data)
 				switch (first(x))
 					{ case 'join':
-						chatlog.appendChild(
+						add_chat_message(
 							Elem.of('article').text(`${second(x)} has joined`).get())
 						break
 					case 'name':
-						chatlog.appendChild(
+						add_chat_message(
 							Elem.of('article').text(`${second(x)} is now known as ${last(x)}`).get())
 						break
 					case 'chat':
-						chatlog.appendChild(
+						add_chat_message(
 							Elem.of('article')
-							.child(Elem.of('strong').text(second(x) + ': ').get())
+							.child(Elem.of('strong').colour(colour(second(x))).text(second(x)).get())
 							.text(last(x))
 							.get())
 						break
@@ -93,10 +159,18 @@
 						video.play()
 						break }}
 
-			function on_key_down(e)
+			function global_key_down(e)
 				{ if (e.keyCode === 13)
-					{ ws.send(msg('chat', this.value))
-					this.value = '' }
+					{ if (document.activeElement !== input)
+						{ input.focus()
+						chat.classList.remove('opaque')
+						clearTimeout(opaque_timer) }
+					else
+						{ if (input.value.trim())
+							{ ws.send(msg('chat', input.value))
+							input.value = '' }
+						input.blur()
+						chat.classList.add('opaque') }}
 				return true }
 
 			window.onload = main
