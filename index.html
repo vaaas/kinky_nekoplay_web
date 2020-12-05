@@ -51,6 +51,10 @@
 				{ position: absolute;
 				right: 1em;
 				bottom: 1em; }
+			video::cue
+				{ background: none;
+				text-shadow: 1px 1px 0px black, -1px -1px 0px black, 0px 0px 8px black;
+				margin-bottom: 2em; }
         </style>
         <script>
 			const first = x => x[0]
@@ -69,6 +73,7 @@
 			let chat
 			let chatlog
 			let video
+			let track
 			let opaque_timer
 			let input
 			const colours = new Map()
@@ -141,6 +146,7 @@
 						video = qs('video')
 						video.addEventListener('pause', () => ws.send(msg('pause')))
 						video.addEventListener('play', () => ws.send(msg('play', video.currentTime)))
+						track = qs('video track')
 						window.onkeydown = global_key_down
 						ws.name = prompt('username?')
 						ws.send(msg('name', ws.name))
@@ -197,6 +203,7 @@
 					case 'video':
 						video.classList.remove('hide')
 						video.src = `/video/${second(x)}`
+						track.src = `/video/${second(x)}.vtt`
 						break
 					case 'ping':
 						ws.send(msg('pong')) }}
@@ -246,7 +253,9 @@
 	<body>
 		<p>Hello, world!</p>
 
-		<video controls class='hide'></video>
+		<video controls class='hide'>
+			<track default>
+		</video>
 
 		<div class='modal hide'>
 			<div class='modal-body'></div>
