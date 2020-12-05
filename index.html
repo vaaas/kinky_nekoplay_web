@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Kinky Nekoplay 2: intellectual edition</title>
+        <meta charset='utf-8'/>
+        <style>
+        </style>
+        <script>
+			function open_websocket_connection(x)
+				{ return new Promise((yes, no) =>
+					{ const ws = new WebSocket(x)
+					ws.onopen = () => yes(ws)
+					ws.onerror = e => no(new Error('bad password')) }) }
+
+			function msg(type, ...args)
+				{ return JSON.stringify([type, ...args])}
+
+            async function main()
+				{ while (true)
+					{ try
+						{ const pass = prompt('password?')
+						if (!pass) throw 'please actually enter a password'
+						document.cookie = `p=${pass}`
+						const ws = await open_websocket_connection(`ws://${location.hostname}:${location.port}`)
+						ws.name = prompt('username?')
+						ws.send(msg('name', ws.name))
+						return }
+					catch (e)
+						{ alert(e) }}}
+
+			function on_open(x)
+				{ console.log(x)
+				this.send('hello world') }
+
+			window.onload = main
+		</script>
+	</head>
+	<body>
+		<p>Hello, world!</p>
+	</body>
+</html>

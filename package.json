@@ -1,0 +1,15 @@
+{
+  "name": "kinky_nekoplay_2",
+  "version": "0.0.0",
+  "description": "watch shit with friends",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "author": "Vasileios Pasialiokis",
+  "license": "AGPL-3.0-or-later",
+  "dependencies": {
+    "ws": "^7.4.1"
+  }
+}
