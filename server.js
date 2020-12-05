@@ -24,9 +24,9 @@ function on_ws_connection(ws)
 	{ connected.add(ws)
 	ws.name = 'anonymous'
 	ws.on('message', on_message)
-	ws.on('close', () => connected.delete(close))
-	ws.on('error', () => connected.delete(close))
-	broadcast('join', ws.name) }
+	ws.on('close', () => connected.delete(ws))
+	ws.on('error', () => connected.delete(ws))
+	broadcast(msg('join', ws.name)) }
 
 function on_message(message)
 	{ try
@@ -35,7 +35,7 @@ function on_message(message)
 			{ case 'name':
 				let old = this.name
 				this.name = second(x)
-				broadcast('name', old, this.name)
+				broadcast(msg('name', old, this.name))
 				break
 			case 'chat':
 				broadcast(msg('chat', this.name, second(x)))
@@ -43,8 +43,8 @@ function on_message(message)
 			case 'pause':
 				broadcast(msg('pause'))
 				break
-			case 'start':
-				broadcast(msg('start', second(x)))
+			case 'play':
+				broadcast(msg('play', second(x)))
 				break
 			default:
 				this.send(msg('error', 'unrecognised command: ' + first(x)))
@@ -59,8 +59,7 @@ function broadcast(x)
 	{ connected.forEach(c => c.send(x)) }
 
 function verify_request(req, socket, head, wss)
-	{ const cookies = parse_cookies(req)
-	if (cookies.p !== CONF.password) return socket.destroy()
+	{ if (!auth(req)) return socket.destroy()
 	wss.handleUpgrade(req, socket, head,
 		ws => wss.emit('connection', ws, req)) }
 
@@ -69,6 +68,10 @@ function parse_cookies(req)
 	if (!header) return {}
 	else return Object.fromEntries
 		(header.split(';').map(x => x.split('='))) }
+
+function auth(req)
+	{ const cookies = parse_cookies(req)
+	return cookies.p === CONF.password }
 
 function read_file(x)
 	{ return new Promise((yes, no) =>
@@ -88,6 +91,8 @@ function route(req)
 	{ switch(req.url)
 		{ case '/':
 			return front_page
+		case '/video':
+			return video
 		default: return null }}
 
 function not_found(x)
@@ -101,7 +106,15 @@ function front_page()
 	{ return read_file('index.html')
 	.then(x => ({ status: 200, data: x })) }
 
+function video()
+	{ if (!auth) return Promise.resolve(unauthorized())
+	else return read_file('video')
+	.then(x => ({ status: 200, data: x })) }
+
 function internal_server_error(x)
 	{ return ({ status: 500, data: `internal server error: ${x}` }) }
+
+function unauthorized()
+	{ return ({ status: 401, data: 'unauthorized' }) }
 
 main()

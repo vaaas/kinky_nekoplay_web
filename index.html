@@ -4,8 +4,39 @@
         <title>Kinky Nekoplay 2: intellectual edition</title>
         <meta charset='utf-8'/>
         <style>
+			.hide { display: none; }
         </style>
         <script>
+			const first = x => x[0]
+			const second = x => x[1]
+			const last = x => x[x.length-1]
+			const tail = x => x.slice(1)
+			const tap = f => x => { f(x) ; return x }
+			const set = k => v => tap(x => x[k] = v)
+			const elem = x => document.createElement(x)
+			const qs = x => document.querySelector(x)
+			const child = e => tap(x => x.appendChild(e))
+			const P = (x, ...fs) => fs.reduce((a,b) => b(a), x)
+			const PP = (...fs) => x => P(x, ...fs)
+			const text = x => document.createTextNode(x)
+			let ws
+			let chatlog
+			let video
+
+			class Elem
+				{ constructor(x)
+					{ this.x = typeof x === 'string' ? document.createElement(x) : x }
+				static of(x) { return new Elem(x) }
+				text(x)
+					{ this.child(document.createTextNode(x))
+					return this }
+				child(x)
+					{ this.x.appendChild(x)
+					return this }
+				get()
+					{ return this.x }}
+
+
 			function open_websocket_connection(x)
 				{ return new Promise((yes, no) =>
 					{ const ws = new WebSocket(x)
@@ -21,21 +52,65 @@
 						{ const pass = prompt('password?')
 						if (!pass) throw 'please actually enter a password'
 						document.cookie = `p=${pass}`
-						const ws = await open_websocket_connection(`ws://${location.hostname}:${location.port}`)
+						ws = await open_websocket_connection(`ws://${location.hostname}:${location.port}`)
+						ws.onmessage = on_message
+						chatlog = qs('#chat > div')
+						qs('#chat input').onkeydown = on_key_down
+						video = qs('video')
+						video.classList.remove('hide')
+						video.addEventListener('pause', () => ws.send(msg('pause')))
+						video.addEventListener('play', () => ws.send(msg('play', video.currentTime)))
 						ws.name = prompt('username?')
 						ws.send(msg('name', ws.name))
 						return }
 					catch (e)
 						{ alert(e) }}}
 
-			function on_open(x)
-				{ console.log(x)
-				this.send('hello world') }
+			function on_message(message)
+				{ const x = JSON.parse(message.data)
+				console.log(message.data)
+				switch (first(x))
+					{ case 'join':
+						chatlog.appendChild(
+							Elem.of('article').text(`${second(x)} has joined`).get())
+						break
+					case 'name':
+						chatlog.appendChild(
+							Elem.of('article').text(`${second(x)} is now known as ${last(x)}`).get())
+						break
+					case 'chat':
+						chatlog.appendChild(
+							Elem.of('article')
+							.child(Elem.of('strong').text(second(x) + ': ').get())
+							.text(last(x))
+							.get())
+						break
+					case 'pause':
+						video.pause()
+						break
+					case 'play':
+						video.currentTime = second(x)
+						video.play()
+						break }}
+
+			function on_key_down(e)
+				{ if (e.keyCode === 13)
+					{ ws.send(msg('chat', this.value))
+					this.value = '' }
+				return true }
 
 			window.onload = main
 		</script>
 	</head>
 	<body>
 		<p>Hello, world!</p>
+
+		<video controls src='/video' class='hide'></video>
+
+		<section id='chat'>
+			<div>
+			</div>
+			<input type='text'/>
+		</section>
 	</body>
 </html>
