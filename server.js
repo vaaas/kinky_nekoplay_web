@@ -30,7 +30,8 @@ const MIME =
 	json: 'application/json',
 	mp4: 'video/mp4',
 	webm: 'video/webm',
-	vtt: 'video/vtt', }
+	vtt: 'video/vtt',
+	png: 'image/png' }
 
 async function main()
 	{ CONF = JSON.parse(await read_file('config.json'))
@@ -164,16 +165,28 @@ function not_found(x)
 	{ return ({ status: 404, data: `not found: ${x}`, mime: MIME.text }) }
 
 function serve(res)
-	{ return function({ status, data, mime=MIME.bin, cache='public' })
-		{ res.writeHead(status, { 'Content-Type' : mime, 'Content-Encoding': 'gzip', 'Cache-Control': cache })
+	{ return function({ status, data, mime=MIME.bin, cache='public', etag=null })
+		{ const headers =
+			{ 'Content-Type' : mime,
+			'Content-Encoding': 'gzip',
+			'Cache-Control': cache }
+		if (etag) headers.etag = etag
+		res.writeHead(status, headers)
 		if (data instanceof stream.Readable)
 			data.pipe(zlib.createGzip()).pipe(res)
 		else
 			gzip(data).then(x => res.end(x)).catch(() => res.end('')) }}
 
 function front_page()
-	{ return access_file('public/index.xhtml', fs.R_OK)
-		.then(x => ({ status: 200, data: fs.createReadStream(x), mime: MIME.xhtml, cache: CACHE.frontpage })) }
+	{ const x = 'public/index.xhtml'
+	return access_file('public/index.xhtml', fs.R_OK)
+		.then(stat)
+		.then(stat => ({
+			status: 200,
+			data: fs.createReadStream(x),
+			mime: MIME.xhtml,
+			etag: `"${stat.mtime.getTime()-1577829600000}"`,
+			cache: CACHE.frontpage })) }
 
 function dir_or_file(req)
 	{ if (!auth) return Promise.return(unauthorized())
@@ -183,19 +196,33 @@ function dir_or_file(req)
 		.then(stat => stat.isDirectory() ?
 			list_directory(x) :
 			stat.isFile() ?
-			static_file(x) :
+			static_file(x, stat) :
 			Promise.reject(new Error('not a directory or a file'))) }
 
 function list_directory(x)
-	{ return read_dir(x).then(xs => ({ status: 200, data: JSON.stringify(xs), mime: MIME.json })) }
+	{ return read_dir(x).then(xs => ({
+		status: 200,
+		data: JSON.stringify(xs),
+		mime: MIME.json })) }
 
-function static_file(x)
-	{ return ({ status: 200, data: fs.createReadStream(x), mime: guess_mime_type(x), cache: CACHE.immutable }) }
+function static_file(x, stat)
+	{ return ({
+		status: 200,
+		data: fs.createReadStream(x),
+		mime: guess_mime_type(x),
+		cache: CACHE.immutable,
+		etag: `"${stat.mtime.getTime()-1577829600000}"`, }) }
 
 function internal_server_error(x)
-	{ return ({ status: 500, data: `internal server error: ${x}`, mime: MIME.text }) }
+	{ return ({
+		status: 500,
+		data: `internal server error: ${x}`,
+		mime: MIME.text }) }
 
 function unauthorized()
-	{ return ({ status: 401, data: 'unauthorized', mime: MIME.text }) }
+	{ return ({
+		status: 401,
+		data: 'unauthorized',
+		mime: MIME.text }) }
 
 main()

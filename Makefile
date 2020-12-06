@@ -7,7 +7,7 @@ public/script.js: public/ script.js
 	terser --compress --mangle < script.js > $@
 
 public/style.css: public/ style.css
-	cat style.css | tr '[:space:]' ' ' | tr -s ' ' > $@
+	cat style.css | tr '[:space:]' ' ' | tr -s ' ' | sed 's/: /:/g' | sed 's/, /,/g' | sed 's/ { /{/g' | sed 's/ } /}/g' > $@
 
 public/:
 	mkdir -p $@

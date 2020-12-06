@@ -73,9 +73,9 @@ async function main()
             document.cookie = `p=${pass}`
             ws = await open_websocket_connection(`ws://${location.hostname}:${location.port}`)
             ws.onmessage = on_message
-            chat = qs('#chat')
-            chatlog = qs('#chat > div')
-            input = qs ('#chat input')
+            chat = qs('aside')
+            chatlog = qs('section')
+            input = qs ('input')
             input.onmousedown = start_drag
             input.onmouseup = end_drag
             video = qs('video')
