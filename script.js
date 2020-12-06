@@ -170,7 +170,7 @@ function enter_pressed(e)
             chat.classList.add('opaque') }}}
 
 function f1_pressed(e)
-    { get('/video').then(x =>
+    { get('/video/').then(x =>
         { const files = JSON.parse(x)
         const modal = qs('.modal')
         const body = qs('.modal-body')

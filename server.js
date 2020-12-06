@@ -21,6 +21,8 @@ const MIME =
 	{ text: 'text/plain',
 	html: 'text/html',
     xhtml: 'application/xhtml+xml',
+    css: 'text/css',
+    js: 'text/javascript',
 	bin: 'application/octet-stream',
 	json: 'application/json',
 	mp4: 'video/mp4',
@@ -126,6 +128,10 @@ function access_file(x, mode)
 	{ return new Promise((yes, no) =>
 		fs.access(x, mode, err => err ? no(err) : yes(x))) }
 
+function stat(x)
+    { return new Promise((yes, no) =>
+        fs.stat(x, (err, stat) => err ? no(err) : yes(stat))) }
+
 function gzip(x)
 	{ return new Promise((yes, no) =>
 		zlib.gzip(x, (err, x) => err ? no(err) : yes(x))) }
@@ -141,16 +147,15 @@ async function request_listener(req, res)
 	try
 		{ s(await f(req)) }
 	catch(e)
-		{ s(internal_server_error(e)) }}
+		{ console.log(e)
+        s(internal_server_error(e)) }}
 
 function route(req)
 	{ switch(true)
 		{ case req.url === '/':
 			return front_page
-		case req.url.endsWith('/'):
-			return list_directory
 		default:
-			return static_file }}
+			return dir_or_file }}
 
 function not_found(x)
 	{ return ({ status: 404, data: `not found: ${x}`, mime: MIME.text }) }
@@ -167,17 +172,22 @@ function front_page()
 	{ return access_file('public/index.xhtml', fs.R_OK)
 		.then(x => ({ status: 200, data: fs.createReadStream(x), mime: MIME.xhtml })) }
 
-function list_directory()
-	{ if (!auth) return Promise.resolve(unrecognised())
-    const x = 'public'+req.url
-	return read_dir(x).then(xs => ({ status: 200, data: JSON.stringify(xs), mime: MIME.json })) }
+function dir_or_file(req)
+    { if (!auth) return Promise.return(unauthorized())
+    const x = 'public' + req.url
+    return access_file(x, fs.R_OK)
+        .then(stat)
+        .then(stat => stat.isDirectory() ?
+            list_directory(x) :
+            stat.isFile() ?
+            static_file(x) :
+            Promise.reject(new Error('not a directory or a file'))) }
 
-function static_file(req)
-	{ if (!auth) return Promise.resolve(unauthorized())
-	const x = 'public'+req.url
-	return access_file(x, fs.R_OK)
-		.then(x => ({ status: 200, data: fs.createReadStream(x), mime: guess_mime_type(x) }))
-		.catch(() => Promise.resolve(not_found(x))) }
+function list_directory(x)
+	{ return read_dir(x).then(xs => ({ status: 200, data: JSON.stringify(xs), mime: MIME.json })) }
+
+function static_file(x)
+	{ return ({ status: 200, data: fs.createReadStream(x), mime: guess_mime_type(x) }) }
 
 function internal_server_error(x)
 	{ return ({ status: 500, data: `internal server error: ${x}`, mime: MIME.text }) }

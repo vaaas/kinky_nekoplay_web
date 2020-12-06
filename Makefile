@@ -1,13 +1,13 @@
 all: public/index.xhtml public/script.js public/style.css
 
-public/index.html: public/ index.xhtml
-    cp index.xhtml public/
+public/index.xhtml: public/ index.xhtml
+	cat index.xhtml | tr '[:space:]' ' ' | tr -s ' ' | sed 's/> </></g' > $@
 
 public/script.js: public/ script.js
-    cp script.js public/
+	terser --compress --mangle < script.js > $@
 
 public/style.css: public/ style.css
-    cp style.cp public/
+	cat style.css | tr '[:space:]' ' ' | tr -s ' ' > $@
 
 public/:
-    mkdir -p $@
+	mkdir -p $@
