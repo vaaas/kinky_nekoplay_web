@@ -11,14 +11,17 @@ const last = x => x[x.length-1]
 
 const seconds = x => x * 1000
 const minutes = x => seconds(60*x)
+const hours = x => minutes(60*x)
+const days = x => hours(24*x)
+const months = x => days(30*x)
 
 let CONF = {}
 let video = null
 const connected = new Set()
 
 const CACHE =
-	{ immutable: 'public, max-age=15778463, immutable',
-	frontpage: 'public, max-age=2629743' }
+	{ immutable: `public, max-age=${months(6)/1000}, immutable`,
+	frontpage: `public, max-age=${months(1)/1000}` }
 
 const MIME =
 	{ text: 'text/plain',
@@ -161,6 +164,9 @@ function route(req)
 		default:
 			return dir_or_file }}
 
+function etag(mtime)
+	{ return `"${(mtime.getTime()-1577829600000).toString(36)}"` }
+
 function not_found(x)
 	{ return ({ status: 404, data: `not found: ${x}`, mime: MIME.text }) }
 
@@ -185,7 +191,7 @@ function front_page()
 			status: 200,
 			data: fs.createReadStream(x),
 			mime: MIME.xhtml,
-			etag: `"${stat.mtime.getTime()-1577829600000}"`,
+			etag: etag(stat.mtime),
 			cache: CACHE.frontpage })) }
 
 function dir_or_file(req)
@@ -211,7 +217,7 @@ function static_file(x, stat)
 		data: fs.createReadStream(x),
 		mime: guess_mime_type(x),
 		cache: CACHE.immutable,
-		etag: `"${stat.mtime.getTime()-1577829600000}"`, }) }
+		etag: etag(stat.mtime), }) }
 
 function internal_server_error(x)
 	{ return ({
