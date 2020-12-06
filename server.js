@@ -2,10 +2,12 @@ const http = require('http')
 const fs = require('fs')
 const ws = require('ws')
 const stream = require('stream')
+const zlib = require('zlib')
 
 const log = console.log
 const first = x => x[0]
 const second = x => x[1]
+const last = x => x[x.length-1]
 const tail = x => x.slice(1)
 
 const seconds = x => x * 1000
@@ -18,8 +20,12 @@ const connected = new Set()
 const MIME =
 	{ text: 'text/plain',
 	html: 'text/html',
+    xhtml: 'application/xhtml+xml',
 	bin: 'application/octet-stream',
-	json: 'application/json', }
+	json: 'application/json',
+	mp4: 'video/mp4',
+	webm: 'video/webm',
+	vtt: 'video/vtt', }
 
 async function main()
 	{ CONF = JSON.parse(await read_file('config.json'))
@@ -32,6 +38,11 @@ async function main()
 	.listen(CONF.port, CONF.hostname, () => log(`server running at ${CONF.hostname}:${CONF.port}`))
 
 	setInterval(ping, minutes(10)) }
+
+function guess_mime_type(x)
+	{ const ext = last(x.split('.'))
+	const type = MIME[ext]
+	return type ? type : MIME.ext }
 
 function ping()
 	{ for (const x of connected.values())
@@ -115,6 +126,10 @@ function access_file(x, mode)
 	{ return new Promise((yes, no) =>
 		fs.access(x, mode, err => err ? no(err) : yes(x))) }
 
+function gzip(x)
+	{ return new Promise((yes, no) =>
+		zlib.gzip(x, (err, x) => err ? no(err) : yes(x))) }
+
 function read_dir(x)
 	{ return new Promise((yes, no) =>
 		fs.readdir(x, (err, files) => err ? no(err) : yes(files))) }
@@ -132,35 +147,36 @@ function route(req)
 	{ switch(true)
 		{ case req.url === '/':
 			return front_page
-		case req.url === '/video':
-			return list_videos
-		case req.url.startsWith('/video/'):
-			return video_file
-		default: return null }}
+		case req.url.endsWith('/'):
+			return list_directory
+		default:
+			return static_file }}
 
 function not_found(x)
 	{ return ({ status: 404, data: `not found: ${x}`, mime: MIME.text }) }
 
 function serve(res)
 	{ return function({ status, data, mime=MIME.bin })
-		{ res.writeHead(status, { 'Content-Type' : mime })
+		{ res.writeHead(status, { 'Content-Type' : mime, 'Content-Encoding': 'gzip' })
 		if (data instanceof stream.Readable)
-			data.pipe(res)
-		else res.end(data) }}
+			data.pipe(zlib.createGzip()).pipe(res)
+		else
+			gzip(data).then(x => res.end(x)).catch(() => res.end('')) }}
 
 function front_page()
-	{ return read_file('index.html')
-	.then(x => ({ status: 200, data: x, mime: MIME.html })) }
+	{ return access_file('public/index.xhtml', fs.R_OK)
+		.then(x => ({ status: 200, data: fs.createReadStream(x), mime: MIME.xhtml })) }
 
-function list_videos()
+function list_directory()
 	{ if (!auth) return Promise.resolve(unrecognised())
-	return read_dir('video').then(xs => ({ status: 200, data: JSON.stringify(xs), mime: MIME.json })) }
+    const x = 'public'+req.url
+	return read_dir(x).then(xs => ({ status: 200, data: JSON.stringify(xs), mime: MIME.json })) }
 
-function video_file(req)
+function static_file(req)
 	{ if (!auth) return Promise.resolve(unauthorized())
-	const x = tail(req.url)
+	const x = 'public'+req.url
 	return access_file(x, fs.R_OK)
-		.then(x => ({ status: 200, data: fs.createReadStream(x), mime: MIME.bin }))
+		.then(x => ({ status: 200, data: fs.createReadStream(x), mime: guess_mime_type(x) }))
 		.catch(() => Promise.resolve(not_found(x))) }
 
 function internal_server_error(x)
