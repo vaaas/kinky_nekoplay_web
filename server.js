@@ -18,6 +18,8 @@ const months = x => days(30*x)
 let CONF = {}
 let video = null
 const connected = new Set()
+let paused = true
+let play_limit = 0
 
 const CACHE =
 	{ immutable: `public, max-age=${months(6)/1000}, immutable`,
@@ -46,7 +48,9 @@ async function main()
 	.on('upgrade', (req, socket, head) => verify_request(req, socket, head, wss))
 	.listen(CONF.port, CONF.hostname, () => log(`server running at ${CONF.hostname}:${CONF.port}`))
 
-	setInterval(ping, minutes(10)) }
+	setInterval(ping, minutes(10))
+	setInterval(() => play_limit = 0, minutes(1))
+	setInterval(() => { for (const x of connected.values()) x.limit = 0 }, minutes(1))
 
 function guess_mime_type(x)
 	{ const ext = last(x.split('.'))
@@ -64,10 +68,11 @@ function on_ws_connection(ws)
 	{ connected.add(ws)
 	ws.name = 'anonymous'
 	ws.pong = true
+	ws.limit = 0
 	ws.on('message', on_message)
 	ws.on('close', on_close_or_error)
 	ws.on('error', on_close_or_error)
-	broadcast(msg('join', ws.name))
+	broadcast(msg('notice', `${ws.name} has joined`))
 	if (video) ws.send(msg('video', video)) }
 
 function on_close_or_error()
@@ -75,32 +80,43 @@ function on_close_or_error()
 	if (connected.size === 0) video = null }
 
 function on_message(message)
-	{ try
+	{ if (this.limit > 100) return
+	this.limit++
+	try
 		{ const x = JSON.parse(message)
 		switch (first(x))
 			{ case 'name':
 				let old = this.name
 				this.name = second(x)
-				broadcast(msg('name', old, this.name))
+				broadcast(msg('notice', `${old} is now known as ${this.name}`))
 				break
 			case 'chat':
 				broadcast(msg('chat', this.name, second(x)))
 				break
 			case 'pause':
+				if (paused) return
+				paused = true
 				broadcast(msg('pause'))
+				broadcast(msg('notice', `${this.name} has paused playback`))
 				break
 			case 'play':
+				if (!paused || play_limit > 3) return
+				play_limit++
+				paused = false
 				broadcast(msg('play', second(x)))
+				broadcast(msg('notice', `${this.name} has resumed playback`))
 				break
 			case 'video':
 				video = second(x)
+				paused = true
 				broadcast(msg('video', video))
+				broadcast(msg('notice', `${this.name} has selected ${video} for playback`))
 				break
 			case 'pong':
 				this.pong = true
 				break
 			default:
-				this.send(msg('error', 'unrecognised command: ' + first(x)))
+				this.send(msg('notice', 'unrecognised command: ' + first(x)))
 				break }}
 	catch (e)
 		{ this.send(msg('error', e)) }}
