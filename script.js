@@ -1,3 +1,6 @@
+'use strict'
+// jshint browser: true
+
 const first = x => x[0]
 const second = x => x[1]
 const last = x => x[x.length-1]
@@ -9,9 +12,18 @@ let chat
 let chatlog
 let video
 let track
-let opaque_timer
 let input
 const colours = new Map()
+
+class Timed
+	{ constructor(f, t)
+		{ this.f = f
+		this.t = t
+		this.id = null }
+	run()
+		{ clearTimeout(this.id)
+		this.id = setTimeout(this.f, this.t) }
+	cancel() { clearTimeout(this.id) }}
 
 function get(x)
 	{ return new Promise((yes) =>
@@ -74,10 +86,15 @@ async function main()
 			ws = await open_websocket_connection(`ws://${location.hostname}:${location.port}`)
 			ws.onmessage = on_message
 			chat = qs('aside')
+			chat.onmousedown = () => { chat.show() ; document.onmousemove = drag(chat) }
+			chat.onmouseup = () => { document.onmousemove = null ; chat.timer.run() }
+			chat.timer = new Timed(hide_chat, 2000)
+			chat.hide = () => chat.classList.add('opaque')
+			chat.show = () => chat.classList.remove('opaque')
 			chatlog = qs('section')
-			input = qs ('input')
-			input.onmousedown = start_drag
-			input.onmouseup = end_drag
+			input = qs('input')
+			input.addEventListener('focus', () => chat.show())
+			input.addEventListener('focusout', () => { if (!document.onmousemove) chat.hide() })
 			video = qs('video')
 			video.addEventListener('pause', () => ws.send(msg('pause')))
 			video.addEventListener('play', () => ws.send(msg('play', video.currentTime)))
@@ -85,30 +102,25 @@ async function main()
 			window.onkeydown = global_key_down
 			ws.name = prompt('username?')
 			ws.send(msg('name', ws.name))
-			hide_chat()
+			chat.timer.run()
 			return }
 		catch (e)
 			{ alert(e) }}}
 
-function start_drag()
-	{ document.onmousemove = drag }
-
-function end_drag()
-	{ document.onmousemove = null }
-
-function drag(e)
-	{ chat.style.top = e.clientY-chat.clientHeight*0.95+'px'
-	chat.style.left = e.clientX-chat.clientWidth*0.5+'px' }
-
 function hide_chat()
-	{ clearTimeout(opaque_timer)
-	opaque_timer = setTimeout(() => chat.classList.add('opaque'), 1000) }
+	{ if (document.activeElement !== input && !document.onmousemove)
+		chat.hide() }
+
+const drag = x => e =>
+	{ console.log('hiiiiiiiii')
+	x.style.top = e.clientY-chat.clientHeight*0.5+'px'
+	x.style.left = e.clientX-chat.clientWidth*0.5+'px' }
 
 function add_chat_message(x)
-	{ chatlog.appendChild(x)
-	chat.classList.remove('opaque')
+	{ chat.show()
+	chatlog.appendChild(x)
 	chatlog.scrollTop = chatlog.scrollHeight
-	if (document.activeElement !== input) hide_chat() }
+	chat.timer.run() }
 
 function on_message(message)
 	{ const x = JSON.parse(message.data)
@@ -147,17 +159,12 @@ function global_key_down(e)
 	return true }
 
 function enter_pressed()
-	{ if (document.activeElement !== input)
-		{ input.focus()
-		chat.classList.remove('opaque')
-		clearTimeout(opaque_timer) }
+	{ if (document.activeElement !== input) input.focus()
 	else
 		{ if (input.value.trim())
 			{ ws.send(msg('chat', input.value))
 			input.value = '' }
-		else
-			{ input.blur()
-			chat.classList.add('opaque') }}}
+		else input.blur() }}
 
 function f1_pressed()
 	{ get('/video/').then(x =>

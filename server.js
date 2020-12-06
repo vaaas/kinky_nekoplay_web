@@ -1,3 +1,6 @@
+'use strict'
+// jshint node: true
+
 const http = require('http')
 const fs = require('fs')
 const ws = require('ws')
@@ -50,7 +53,7 @@ async function main()
 
 	setInterval(ping, minutes(10))
 	setInterval(() => play_limit = 0, minutes(1))
-	setInterval(() => { for (const x of connected.values()) x.limit = 0 }, minutes(1))
+	setInterval(() => { for (const x of connected.values()) x.limit = 0 }, minutes(1)) }
 
 function guess_mime_type(x)
 	{ const ext = last(x.split('.'))
