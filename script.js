@@ -1,13 +1,7 @@
 const first = x => x[0]
 const second = x => x[1]
 const last = x => x[x.length-1]
-const tail = x => x.slice(1)
-const tap = f => x => { f(x) ; return x }
-const set = k => v => tap(x => x[k] = v)
-const elem = x => document.createElement(x)
 const qs = x => document.querySelector(x)
-const child = e => tap(x => x.appendChild(e))
-const text = x => document.createTextNode(x)
 const randint = (a, b) => Math.floor(Math.random()*(b-a) + a)
 
 let ws
@@ -20,7 +14,7 @@ let input
 const colours = new Map()
 
 function get(x)
-    { return new Promise((yes, no) =>
+    { return new Promise((yes) =>
         { const req = new XMLHttpRequest()
         req.onload = () => yes(req.responseText)
         req.open("GET", x)
@@ -66,7 +60,7 @@ function open_websocket_connection(x)
     { return new Promise((yes, no) =>
         { const ws = new WebSocket(x)
         ws.onopen = () => yes(ws)
-        ws.onerror = e => no(new Error('bad password')) }) }
+        ws.onerror = () => no(new Error('bad password')) }) }
 
 function msg(type, ...args)
     { return JSON.stringify([type, ...args])}
@@ -156,7 +150,7 @@ function global_key_down(e)
         f1_pressed(e)
     return true }
 
-function enter_pressed(e)
+function enter_pressed()
     { if (document.activeElement !== input)
         { input.focus()
         chat.classList.remove('opaque')
@@ -169,7 +163,7 @@ function enter_pressed(e)
             { input.blur()
             chat.classList.add('opaque') }}}
 
-function f1_pressed(e)
+function f1_pressed()
     { get('/video/').then(x =>
         { const files = JSON.parse(x)
         const modal = qs('.modal')

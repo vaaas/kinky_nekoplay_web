@@ -8,7 +8,6 @@ const log = console.log
 const first = x => x[0]
 const second = x => x[1]
 const last = x => x[x.length-1]
-const tail = x => x.slice(1)
 
 const seconds = x => x * 1000
 const minutes = x => seconds(60*x)
@@ -17,12 +16,16 @@ let CONF = {}
 let video = null
 const connected = new Set()
 
+const CACHE =
+	{ immutable: 'public, max-age=15778463, immutable',
+	frontpage: 'public, max-age=2629743' }
+
 const MIME =
 	{ text: 'text/plain',
 	html: 'text/html',
-    xhtml: 'application/xhtml+xml',
-    css: 'text/css',
-    js: 'text/javascript',
+	xhtml: 'application/xhtml+xml',
+	css: 'text/css',
+	js: 'text/javascript',
 	bin: 'application/octet-stream',
 	json: 'application/json',
 	mp4: 'video/mp4',
@@ -129,8 +132,8 @@ function access_file(x, mode)
 		fs.access(x, mode, err => err ? no(err) : yes(x))) }
 
 function stat(x)
-    { return new Promise((yes, no) =>
-        fs.stat(x, (err, stat) => err ? no(err) : yes(stat))) }
+	{ return new Promise((yes, no) =>
+		fs.stat(x, (err, stat) => err ? no(err) : yes(stat))) }
 
 function gzip(x)
 	{ return new Promise((yes, no) =>
@@ -148,7 +151,7 @@ async function request_listener(req, res)
 		{ s(await f(req)) }
 	catch(e)
 		{ console.log(e)
-        s(internal_server_error(e)) }}
+		s(internal_server_error(e)) }}
 
 function route(req)
 	{ switch(true)
@@ -161,8 +164,8 @@ function not_found(x)
 	{ return ({ status: 404, data: `not found: ${x}`, mime: MIME.text }) }
 
 function serve(res)
-	{ return function({ status, data, mime=MIME.bin })
-		{ res.writeHead(status, { 'Content-Type' : mime, 'Content-Encoding': 'gzip' })
+	{ return function({ status, data, mime=MIME.bin, cache='public' })
+		{ res.writeHead(status, { 'Content-Type' : mime, 'Content-Encoding': 'gzip', 'Cache-Control': cache })
 		if (data instanceof stream.Readable)
 			data.pipe(zlib.createGzip()).pipe(res)
 		else
@@ -170,24 +173,24 @@ function serve(res)
 
 function front_page()
 	{ return access_file('public/index.xhtml', fs.R_OK)
-		.then(x => ({ status: 200, data: fs.createReadStream(x), mime: MIME.xhtml })) }
+		.then(x => ({ status: 200, data: fs.createReadStream(x), mime: MIME.xhtml, cache: CACHE.frontpage })) }
 
 function dir_or_file(req)
-    { if (!auth) return Promise.return(unauthorized())
-    const x = 'public' + req.url
-    return access_file(x, fs.R_OK)
-        .then(stat)
-        .then(stat => stat.isDirectory() ?
-            list_directory(x) :
-            stat.isFile() ?
-            static_file(x) :
-            Promise.reject(new Error('not a directory or a file'))) }
+	{ if (!auth) return Promise.return(unauthorized())
+	const x = 'public' + req.url
+	return access_file(x, fs.R_OK)
+		.then(stat)
+		.then(stat => stat.isDirectory() ?
+			list_directory(x) :
+			stat.isFile() ?
+			static_file(x) :
+			Promise.reject(new Error('not a directory or a file'))) }
 
 function list_directory(x)
 	{ return read_dir(x).then(xs => ({ status: 200, data: JSON.stringify(xs), mime: MIME.json })) }
 
 function static_file(x)
-	{ return ({ status: 200, data: fs.createReadStream(x), mime: guess_mime_type(x) }) }
+	{ return ({ status: 200, data: fs.createReadStream(x), mime: guess_mime_type(x), cache: CACHE.immutable }) }
 
 function internal_server_error(x)
 	{ return ({ status: 500, data: `internal server error: ${x}`, mime: MIME.text }) }
