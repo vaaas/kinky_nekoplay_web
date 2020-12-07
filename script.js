@@ -43,7 +43,7 @@ class Elem
 		{ this.child(document.createTextNode(x))
 		return this }
 	child(x)
-		{ this.x.appendChild(x)
+		{ this.x.appendChild(x instanceof Elem ? x.get() : x)
 		return this }
 	children(xs)
 		{ for (const x of xs) this.child(x)
@@ -78,42 +78,41 @@ function msg(type, ...args)
 	{ return JSON.stringify([type, ...args])}
 
 async function main()
-	{ while (true)
+	{ chat = qs('aside')
+	chat.onmousedown = () => { chat.show() ; document.onmousemove = drag(chat) }
+	chat.onmouseup = () => { document.onmousemove = null ; chat.timer.run() }
+	chat.timer = new Timed(hide_chat, 2000)
+	chat.hide = () => chat.classList.add('opaque')
+	chat.show = () => chat.classList.remove('opaque')
+	chat.timer.run()
+	chatlog = qs('section')
+	input = qs('input')
+	input.addEventListener('focus', () => chat.show())
+	input.addEventListener('focusout', () => { if (!document.onmousemove) chat.hide() })
+	video = qs('video')
+	video.addEventListener('pause', () => ws.send(msg('pause')))
+	video.addEventListener('play', () => ws.send(msg('play', video.currentTime)))
+	track = qs('video track')
+	window.onkeydown = global_key_down
+
+	while (true)
 		{ try
 			{ const pass = prompt('password?')
 			if (!pass) throw 'please actually enter a password'
 			document.cookie = `p=${pass}`
 			ws = await open_websocket_connection(`ws://${location.hostname}:${location.port}`)
 			ws.onmessage = on_message
-			chat = qs('aside')
-			chat.onmousedown = () => { chat.show() ; document.onmousemove = drag(chat) }
-			chat.onmouseup = () => { document.onmousemove = null ; chat.timer.run() }
-			chat.timer = new Timed(hide_chat, 2000)
-			chat.hide = () => chat.classList.add('opaque')
-			chat.show = () => chat.classList.remove('opaque')
-			chatlog = qs('section')
-			input = qs('input')
-			input.addEventListener('focus', () => chat.show())
-			input.addEventListener('focusout', () => { if (!document.onmousemove) chat.hide() })
-			video = qs('video')
-			video.addEventListener('pause', () => ws.send(msg('pause')))
-			video.addEventListener('play', () => ws.send(msg('play', video.currentTime)))
-			track = qs('video track')
-			window.onkeydown = global_key_down
 			ws.name = prompt('username?')
 			ws.send(msg('name', ws.name))
-			chat.timer.run()
 			return }
-		catch (e)
-			{ alert(e) }}}
+		catch (e) { alert(e) }}}
 
 function hide_chat()
 	{ if (document.activeElement !== input && !document.onmousemove)
 		chat.hide() }
 
 const drag = x => e =>
-	{ console.log('hiiiiiiiii')
-	x.style.top = e.clientY-chat.clientHeight*0.5+'px'
+	{ x.style.top = e.clientY-chat.clientHeight*0.5+'px'
 	x.style.left = e.clientX-chat.clientWidth*0.5+'px' }
 
 function add_chat_message(x)
@@ -132,7 +131,7 @@ function on_message(message)
 		case 'chat':
 			add_chat_message(
 				Elem.of('article')
-				.child(Elem.of('strong').colour(colour(second(x))).text(second(x)).get())
+				.child(Elem.of('strong').colour(colour(second(x))).text(second(x)))
 				.text(last(x))
 				.get())
 			break
@@ -175,7 +174,7 @@ function f1_pressed()
 		empty(body)
 		const select = Elem.of('select')
 			.children(
-				files.map(x => Elem.of('option').value(x).text(x).get()))
+				files.map(x => Elem.of('option').value(x).text(x)))
 			.get()
 		body.appendChild(select)
 		button.onclick = () => {
