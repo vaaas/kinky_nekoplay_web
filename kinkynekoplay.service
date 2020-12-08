@@ -5,6 +5,7 @@ After=network.target
 [Service]
 Type=simple
 User=www-data
+WorkingDirectory=/var/www/kinkynekoplay
 ExecStart=/usr/bin/node /var/www/kinkynekoplay/server.js
 Restart=on-failure
 
