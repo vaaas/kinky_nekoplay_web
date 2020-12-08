@@ -1,5 +1,6 @@
 {
-    "hostname": "0.0.0.0",
-    "port": 50000,
-    "password": "memes"
+	"hostname": "0.0.0.0",
+	"port": 50000,
+	"socket": "/tmp/kinkynekoplay.socket",
+	"password": "memes"
 }
