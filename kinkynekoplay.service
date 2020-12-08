@@ -1,0 +1,12 @@
+[Unit]
+Description=kinky nekoplay
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+ExecStart=/usr/bin/node /var/www/kinkynekoplay/server.js
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
