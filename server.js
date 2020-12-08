@@ -149,10 +149,12 @@ async function http_server(wss)
 	const server = http.createServer(request_listener)
 		.on('upgrade', (req, socket, head) => upgrade_wss(req, socket, head, wss))
 	if (CONF.socket)
-		{ server.listen(CONF.socket, log(`server running at unix:${CONF.socket}`))
-		process.on('exit', () => fs.rmSync(CONF.socket)) }
+		access_file(CONF.socket, fs.F_OK)
+		.then(() => fs.rmSync(CONF.socket))
+		.catch(() => true)
+		.finally(() => server.listen(CONF.socket, () => log(`server running at unix:${CONF.socket}`)))
 	else
-		server.listen(CONF.port, CONF.hostname, log(`server running at ${CONF.hostname}:${CONF.port}`))
+		server.listen(CONF.port, CONF.hostname, () => log(`server running at ${CONF.hostname}:${CONF.port}`))
 	return server }
 
 function ws_server()
