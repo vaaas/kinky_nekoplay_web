@@ -165,7 +165,7 @@ function ws_server()
 		{ ws.name = 'anonymous'
 		ws.pong = true
 		ws.limit = 0
-		ws.on('message', on_message(wss, ws))
+		ws.on('message', on_message(ws))
 		ws.on('close', on_close_or_error)
 		ws.on('error', on_close_or_error)
 		broadcast(msg('notice', `${ws.name} has joined`))
