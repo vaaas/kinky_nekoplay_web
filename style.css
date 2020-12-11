@@ -34,10 +34,12 @@ input
     padding: 0.3em;
     margin-top: 0.5em; }
 input:focus
-    { background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.1); }
+    { background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1); }
 .opaque { opacity: 0; }
-strong { padding-right: 1em; }
+strong
+    { padding-right: 1em;
+    white-space: nowrap; }
 .modal
     { position: fixed;
     top: 33%;
