@@ -5,7 +5,6 @@ const http = require('http')
 const fs = require('fs')
 const ws = require('ws')
 const stream = require('stream')
-const zlib = require('zlib')
 
 const log = console.log
 const first = x => x[0]
@@ -69,9 +68,6 @@ async function http_server(wss)
 	const stat = x => new Promise((yes, no) =>
 		fs.stat(x, (err, stat) => err ? no(err) : yes(stat)))
 
-	const gzip = x => new Promise((yes, no) =>
-		zlib.gzip(x, (err, x) => err ? no(err) : yes(x)))
-
 	const read_dir = x => new Promise((yes, no) =>
 		fs.readdir(x, (err, files) => err ? no(err) : yes(files)))
 
@@ -90,14 +86,13 @@ async function http_server(wss)
 	function serve(res, { status, data, mime=MIME.bin, cache='public', etag=null })
 		{ const headers =
 			{ 'Content-Type' : mime,
-			'Content-Encoding': 'gzip',
 			'Cache-Control': cache }
 		if (etag) headers.etag = etag
 		res.writeHead(status, headers)
 		if (data instanceof stream.Readable)
-			data.pipe(zlib.createGzip()).pipe(res)
+			data.pipe(res)
 		else
-			gzip(data).then(x => res.end(x)).catch(() => res.end('')) }
+            res.end(data) }
 
 	function front_page()
 		{ const x = 'public/index.xhtml'
