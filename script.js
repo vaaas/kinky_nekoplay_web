@@ -100,7 +100,7 @@ async function main()
 			{ const pass = prompt('password?')
 			if (!pass) throw 'please actually enter a password'
 			document.cookie = `p=${pass}`
-			ws = await open_websocket_connection(`wss://${location.hostname}:${location.port}/ws`)
+			ws = await open_websocket_connection(`ws://${location.hostname}:${location.port}/ws`)
 			ws.onmessage = on_message
 			ws.name = prompt('username?')
 			ws.send(msg('name', ws.name))

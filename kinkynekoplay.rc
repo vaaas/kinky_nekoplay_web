@@ -1,0 +1,35 @@
+#!/sbin/openrc-run
+  
+name="kinkynekoplay"
+dir="/srv/kinky_nekoplay_web"
+command="/usr/bin/node server.js"
+command_user="nginx"
+pidfile="/run/kinkynekoplay.pid"
+command_background="yes"
+output_log="/var/log/kinkynekoplay.log"
+error_log="/var/log/kinkynekoplay.err"
+
+depend() {
+        need net
+}
+
+start_pre() {
+	cd $dir
+
+	if test -e /tmp/kinkynekoplay.socket
+	then
+		rm /tmp/kinkynekoplay.socket
+	fi
+
+	if ! test -e $output_log
+	then
+		touch $output_log
+		chmod 666 $output_log
+	fi
+
+	if ! test -e $error_log
+	then
+		touch $error_log
+		chmod 666 $error_log
+	fi
+}
