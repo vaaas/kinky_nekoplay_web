@@ -140,7 +140,7 @@ function on_message(message)
 			break
 		case 'play':
 			video.currentTime = second(x)
-			video.play()
+			setTimeout(() => video.play(), 500)
 			break
 		case 'video':
 			video.classList.remove('hide')
@@ -153,7 +153,7 @@ function on_message(message)
 function global_key_down(e)
 	{ if (e.keyCode === 13)
 		enter_pressed(e)
-	else if (e.keyCode === 112)
+	else if (e.keyCode === 113)
 		f1_pressed(e)
 	return true }
 

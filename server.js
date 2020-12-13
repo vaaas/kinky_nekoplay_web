@@ -76,18 +76,20 @@ async function http_server(wss)
 		try
 			{ serve(res, await f(req)) }
 		catch(e)
-			{ console.log(e)
+			{ log(e)
 			serve(res, internal_server_error(e)) }}
 
 	const route = x => x.url === '/' ? front_page : dir_or_file
 
 	const etag = mtime => `"${(mtime.getTime()-1577829600000).toString(36)}"`
 
-	function serve(res, { status, data, mime=MIME.bin, cache='public', etag=null })
+	function serve(res, { status, data, mime=MIME.bin, cache='public', etag=null, size=null, })
 		{ const headers =
 			{ 'Content-Type' : mime,
-			'Cache-Control': cache }
+			'Cache-Control': cache,
+			'Accept-Ranges': 'bytes' }
 		if (etag) headers.etag = etag
+		if (size) headers['Content-Length'] = size
 		res.writeHead(status, headers)
 		if (data instanceof stream.Readable)
 			data.pipe(res)
@@ -103,6 +105,7 @@ async function http_server(wss)
 				data: fs.createReadStream(x),
 				mime: MIME.xhtml,
 				etag: etag(stat.mtime),
+				size: stat.size,
 				cache: CACHE.frontpage })) }
 
 	function dir_or_file(req)
@@ -127,6 +130,7 @@ async function http_server(wss)
 		data: fs.createReadStream(x),
 		mime: guess_mime_type(x),
 		cache: CACHE.immutable,
+		size: stat.size,
 		etag: etag(stat.mtime), })
 
 	const internal_server_error = x =>
@@ -202,7 +206,7 @@ function ws_server()
 				broadcast(msg('notice', `${ws.name} has paused playback`))
 				break
 			case 'play':
-				if (!paused || play_limit > 3) return
+				if (!paused || play_limit > 10) return
 				play_limit++
 				paused = false
 				broadcast(msg('play', second(x)))
