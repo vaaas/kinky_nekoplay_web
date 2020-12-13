@@ -110,7 +110,7 @@ async function http_server(wss)
 
 	function dir_or_file(req)
 		{ if (!auth) return Promise.return(unauthorized())
-		const x = 'public' + req.url
+		const x = 'public' + decodeURIComponent(req.url)
 		return access_file(x, fs.R_OK)
 			.then(stat)
 			.then(stat => stat.isDirectory() ?
