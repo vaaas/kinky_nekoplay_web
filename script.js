@@ -140,7 +140,7 @@ function on_message(message)
 			break
 		case 'play':
 			video.currentTime = second(x)
-			setTimeout(() => video.play(), 500)
+			video.play()
 			break
 		case 'video':
 			video.classList.remove('hide')
